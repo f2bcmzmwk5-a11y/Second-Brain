@@ -1,0 +1,17 @@
+# ===========================================================================
+#  Was NICHT auf GitHub landen darf
+# ===========================================================================
+
+# WICHTIG: Backup-Dateien enthalten deine echten Notizen.
+# Das Repository ist oeffentlich - diese Dateien duerfen dort nie hinein.
+second-brain_*.json
+second-brain_*.zip
+*.backup.json
+
+# Oertliche Einstellungen von Claude Code
+.claude/settings.local.json
+
+# Windows- und Mac-Kram
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Second Brain</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Persönliche Notiz-App. Alle Daten bleiben auf dem Gerät.">
+
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Second Brain">
+<meta name="theme-color" content="#f6f6f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Hinweisleiste (z. B. "Backup ist alt", "Neue Version verfügbar") -->
+<div id="banner" class="banner" hidden></div>
+
+<header class="appbar">
+  <button id="btn-back" class="appbar-btn" type="button" hidden aria-label="Zurück">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <h1 id="appbar-title">Inbox</h1>
+  <button id="btn-menu" class="appbar-btn" type="button" aria-label="Menü">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+  </button>
+</header>
+
+<main id="view" class="view"></main>
+
+<button id="fab" class="fab" type="button" aria-label="Neue Notiz">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<nav class="tabbar" id="tabbar">
+  <a class="tab" href="#/inbox" data-tab="inbox">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h5l1 3h6l1-3h5M4 5h16l1 8v6H3v-6z"/></svg>
+    <span>Inbox</span>
+  </a>
+  <a class="tab" href="#/projekte" data-tab="projekte">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h6l2 2h8v10H4z"/><path d="M4 7V5h6l2 2"/></svg>
+    <span>Projekte</span>
+  </a>
+  <a class="tab" href="#/wissen" data-tab="wissen">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7v15H4zM13 5h7v15h-7z"/></svg>
+    <span>Wissen</span>
+  </a>
+  <a class="tab" href="#/archiv" data-tab="archiv">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v4H3zM5 10h14v10H5zM9 14h6"/></svg>
+    <span>Archiv</span>
+  </a>
+  <a class="tab" href="#/suche" data-tab="suche">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg>
+    <span>Suche</span>
+  </a>
+</nav>
+
+<!-- Aufklapp-Menü von unten -->
+<div id="sheet" class="sheet-wrap" hidden>
+  <div class="sheet-backdrop" data-close="1"></div>
+  <div class="sheet" role="dialog" aria-modal="true"></div>
+</div>
+
+<!-- Markdown-Darstellung. Fehlt die Datei (offline, erster Start),
+     benutzt markdown.js einen einfachen eigenen Ersatz. -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" crossorigin="anonymous"></script>
+
+<script src="db.js"></script>
+<script src="markdown.js"></script>
+<script src="backup.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
