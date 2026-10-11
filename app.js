@@ -1182,6 +1182,144 @@
      Einstellungen
      ==================================================================== */
 
+  /* ====================================================================
+     Übertragen zwischen iPhone und PC
+     ==================================================================== */
+
+  // Bericht des letzten Einlesens, damit er nach dem Neuzeichnen bleibt
+  var letzterBericht = null;
+
+  function renderTransfer() {
+    titleEl.textContent = 'Übertragen';
+    backBtn.hidden = false;
+    fab.hidden = true;
+
+    clear(view);
+
+    var kopf = el('div', { class: 'rows' });
+    view.appendChild(kopf);
+
+    /* --- Bericht des letzten Einlesens --- */
+    if (letzterBericht) {
+      var b = letzterBericht;
+      letzterBericht = null;
+
+      var zeilen = [
+        ['Neu dazugekommen', b.added],
+        ['Aktualisiert', b.updated],
+        ['Unverändert', b.unchanged]
+      ];
+      if (b.attachments) zeilen.push(['Anhänge', b.attachments]);
+
+      var box = el('div', { class: 'report' }, [
+        el('div', { class: 'report-head', text: 'Eingelesen' }),
+        el('div', { class: 'rows' }, zeilen.map(function (z) {
+          return el('div', { class: 'row' }, [
+            el('span', { class: 'label', text: z[0] }),
+            el('span', { class: 'value', text: String(z[1]) })
+          ]);
+        }))
+      ]);
+
+      if (b.conflicts && b.conflicts.length) {
+        box.appendChild(el('div', { class: 'report-conflict' }, [
+          el('strong', {
+            text: b.conflicts.length === 1
+              ? '1 Notiz war auf beiden Geräten geändert'
+              : b.conflicts.length + ' Notizen waren auf beiden Geräten geändert'
+          }),
+          el('p', { class: 'small', text: 'Die neuere Fassung steht jetzt in der Notiz. ' +
+                                          'Die andere wurde als Kopie gesichert:' }),
+          el('ul', { class: 'small' }, b.conflicts.map(function (t) {
+            return el('li', { text: t });
+          }))
+        ]));
+      }
+
+      view.appendChild(box);
+    }
+
+    /* --- Die zwei Richtungen --- */
+    view.appendChild(el('div', { class: 'section-head', text: 'Datei' }));
+
+    view.appendChild(el('button', {
+      class: 'btn btn-primary btn-block', type: 'button',
+      onclick: function (e) {
+        runExport(e.currentTarget, Backup.exportZip, 'ZIP');
+      }
+    }, [el('span', { text: 'Datei für das andere Gerät erzeugen' })]));
+
+    var fileInput = el('input', {
+      type: 'file', accept: '.zip,.json,application/zip,application/json', hidden: true
+    });
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files && fileInput.files[0];
+      fileInput.value = '';
+      if (file) startImport(file);
+    });
+
+    view.appendChild(el('button', {
+      class: 'btn btn-block', type: 'button',
+      style: 'margin-top:8px',
+      onclick: function () { fileInput.click(); }
+    }, [el('span', { text: 'Datei vom anderen Gerät einlesen' })]));
+    view.appendChild(fileInput);
+
+    view.appendChild(el('p', { class: 'hint' }, [
+      'Beide Geräte behalten ihre eigene Datenbank. Beim Einlesen wird ' +
+      'zusammengeführt: Bei derselben Notiz gewinnt die neuere Fassung. ' +
+      'Wurde sie auf beiden Geräten geändert, bleibt die unterlegene als ' +
+      'Kopie erhalten – es geht also nichts verloren.'
+    ]));
+
+    /* --- Gerätename --- */
+    view.appendChild(el('div', { class: 'section-head', text: 'Dieses Gerät' }));
+    var nameRow = el('div', { class: 'rows' });
+    view.appendChild(nameRow);
+    view.appendChild(el('p', { class: 'hint' }, [
+      'Der Name taucht in Konflikt-Kopien auf, damit du sie zuordnen kannst.'
+    ]));
+
+    /* --- Werte nachladen --- */
+    Promise.all([Sync.deviceName(), Sync.lastSync(), DB.count()]).then(function (r) {
+      var name = r[0];
+      var seit = r[1];
+      var anzahl = r[2];
+
+      clear(kopf);
+      kopf.appendChild(el('div', { class: 'row' }, [
+        el('span', { class: 'label', text: 'Notizen hier' }),
+        el('span', { class: 'value', text: String(anzahl) })
+      ]));
+      kopf.appendChild(el('div', { class: 'row' }, [
+        el('span', { class: 'label', text: 'Zuletzt übertragen' }),
+        el('span', {
+          class: 'value',
+          text: seit ? new Date(seit).toLocaleString('de-DE', {
+            day: '2-digit', month: '2-digit', year: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+          }) : 'noch nie'
+        })
+      ]));
+
+      clear(nameRow);
+      var feld = el('input', {
+        class: 'name-field', type: 'text', value: name, maxlength: 24,
+        'aria-label': 'Gerätename'
+      });
+      feld.addEventListener('change', function () {
+        Sync.setDeviceName(feld.value).then(function () {
+          toast('Name gespeichert');
+          renderTransfer();
+        });
+      });
+      nameRow.appendChild(el('div', { class: 'row' }, [
+        el('span', { class: 'label', text: 'Name' }),
+        feld
+      ]));
+    });
+  }
+
   function renderSettings() {
     titleEl.textContent = 'Einstellungen';
     backBtn.hidden = false;
@@ -1220,6 +1358,10 @@
       onclick: function () { fileInput.click(); }
     }, [el('span', { text: 'Import aus ZIP oder JSON' })]));
     view.appendChild(fileInput);
+
+    view.appendChild(el('a', {
+      class: 'btn btn-block', href: '#/uebertragen', style: 'margin-top:8px'
+    }, [el('span', { text: 'Übertragen zwischen iPhone und PC →' })]));
 
     view.appendChild(el('p', { class: 'hint' }, [
       '**ZIP ist die vollständige Sicherung**: Notizen, Lernstand und Anhänge, ' +
@@ -1372,13 +1514,15 @@
           label: inhalt + ' · vom ' + when,
           items: [
             {
-              label: 'Dazu laden (empfohlen)',
+              label: 'Zusammenführen (empfohlen)',
               onClick: function () {
                 toast('Wird eingelesen …');
                 Backup.apply(parsed, 'merge').then(function (r) {
-                  toast(r.added + ' neu, ' + r.updated + ' aktualisiert' +
-                        (r.attachments ? ', ' + r.attachments + ' Anhänge' : ''));
-                  render();
+                  // go() zeichnet den Bildschirm - dort wird der Bericht
+                  // einmalig angezeigt und danach verworfen.
+                  letzterBericht = r;
+                  updateDueBadge();
+                  go('#/uebertragen');
                 }).catch(importFailed);
               }
             },
@@ -1424,6 +1568,7 @@
         { label: 'Neu aus Vorlage …', onClick: templateSheet },
         { label: 'Tägliche Notiz', onClick: openDaily },
         { label: 'Aus Zwischenablage einfügen', onClick: pasteFromClipboard },
+        { label: 'Übertragen (iPhone ↔ PC)', onClick: function () { go('#/uebertragen'); } },
         { label: 'Einstellungen & Backup', onClick: function () { go('#/einstellungen'); } }
       ]
     }]);
@@ -1478,6 +1623,8 @@
       done = renderTag(decodeURIComponent(parts[1]));
     } else if (route === 'lernen') {
       done = renderLearn();
+    } else if (route === 'uebertragen') {
+      done = renderTransfer();
     } else if (route === 'einstellungen') {
       done = renderSettings();
     } else {

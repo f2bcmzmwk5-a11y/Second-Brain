@@ -818,6 +818,48 @@ svg {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Übertragen ---------- */
+
+.report {
+  padding: 14px;
+  margin-bottom: 18px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.report-head {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 680;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.report .rows { margin-bottom: 0; }
+
+.report-conflict {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--accent);
+}
+.report-conflict p { margin: 6px 0; color: var(--text-dim); }
+.report-conflict ul { margin: 6px 0 0; padding-left: 18px; }
+.report-conflict li { margin-bottom: 3px; }
+
+.name-field {
+  flex: none;
+  width: 150px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  text-align: right;
+}
+.name-field:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
 /* ---------- Toast ---------- */
 
 .toast {

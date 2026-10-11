@@ -6,7 +6,7 @@
    Dateien aus dem Zwischenspeicher.
    ========================================================================== */
 
-var VERSION = 'v1.2.0';
+var VERSION = 'v1.3.0';
 var CACHE = 'second-brain-' + VERSION;
 
 // Eigene Dateien – muessen alle vorhanden sein.
@@ -17,6 +17,7 @@ var APP_FILES = [
   './db.js',
   './markdown.js',
   './share.js',
+  './sync.js',
   './flashcards.js',
   './attachments.js',
   './backup.js',

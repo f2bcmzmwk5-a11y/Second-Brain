@@ -29,11 +29,12 @@ window.Backup = (function () {
    */
   function buildJson() {
     return Promise.all([
-      DB.listAll(), DB.allMeta(), DB.allCards(), DB.allAttachments()
+      DB.listAll(), DB.allMeta(), DB.allCards(), DB.allAttachments(), Sync.deviceName()
     ]).then(function (res) {
       var notes = res[0];
       var meta = res[1];
       var cards = res[2];
+      var device = res[4];
       var attachments = res[3].map(function (a) {
         return {
           id: a.id,
@@ -50,6 +51,7 @@ window.Backup = (function () {
         app: 'second-brain',
         format: FORMAT,
         exportedAt: new Date().toISOString(),
+        device: device,
         noteCount: notes.length,
         meta: meta,
         notes: notes,
@@ -264,6 +266,7 @@ window.Backup = (function () {
       attachments: attachments,
       meta: data.meta && typeof data.meta === 'object' ? data.meta : null,
       exportedAt: data.exportedAt || null,
+      device: typeof data.device === 'string' ? data.device : null,
       format: Number(data.format) || 1,
       skipped: data.notes.length - notes.length,
       files: null        // wird beim ZIP gefuellt
@@ -349,7 +352,8 @@ window.Backup = (function () {
         return { mode: 'replace', total: n };
       });
     } else {
-      schritt = DB.mergeAll(parsed.notes).then(function (r) {
+      // Zusammenfuehren mit Konflikt-Sicherung (sync.js)
+      schritt = Sync.merge(parsed).then(function (r) {
         r.mode = 'merge';
         return r;
       });
@@ -370,6 +374,7 @@ window.Backup = (function () {
           // Karten mit dem Notiztext abgleichen (neue Zeilen, geloeschte)
           return Cards.syncAll();
         })
+        .then(function () { return Sync.markSynced(); })
         .then(function () { return ergebnis; });
     });
   }
@@ -378,8 +383,12 @@ window.Backup = (function () {
 
   var MAX_AGE_DAYS = 14;
 
+  // Ein Export ist zugleich der Stand, auf dem beide Geraete zuletzt
+  // uebereinstimmten - darum wird auch der Abgleichs-Zeitpunkt gesetzt.
   function markBackedUp() {
-    return DB.setMeta('lastBackup', Date.now());
+    return DB.setMeta('lastBackup', Date.now()).then(function () {
+      return Sync.markSynced();
+    });
   }
 
   function status() {

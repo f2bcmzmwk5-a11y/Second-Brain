@@ -101,14 +101,51 @@ der Kalendertermin **nicht** mit. Echte Push-Benachrichtigungen wären die
 saubere Lösung – siehe „Optional später“.
 
 ### Phase 3 – Synchronisation mit dem Windows-PC
-Vor der Umsetzung eigenen Plan erstellen und ehrlich vergleichen
-(Aufwand, Kosten, Datenschutz, Zuverlässigkeit, Konfliktlösung):
-- Manueller Abgleich per Export/Import
-- Eigener kleiner Sync-Server auf dem PC im Heimnetz
-- Ende-zu-Ende-verschlüsselter Sync über einen Cloud-Dienst
-- Umstieg auf Obsidian-kompatible Markdown-Dateien (iCloud-Vault)
 
-→ Empfehlung abgeben, **erst nach Freigabe bauen.**
+**Drei Grenzen, die alles entscheiden:**
+1. Eine iOS-PWA darf **nicht in Ordner schreiben** – nur Datei auswählen
+   (Import) und Teilen-Menü (Export). Direkter Zugriff auf iCloud Drive
+   ist nicht möglich.
+2. Eine HTTPS-Seite darf **keine HTTP-Adresse** ansprechen. Die App auf
+   GitHub Pages kann einen PC im Heimnetz (`http://192.168.x.x`) also
+   nicht erreichen – Safari blockiert das.
+3. **Kein Hintergrund-Abgleich** in Safari. Synchronisiert wird nur,
+   solange die App offen ist.
+
+**Verglichen wurde:**
+
+| | Aufwand | Kosten | Datenschutz | Zuverlässigkeit | Überall |
+|---|---|---|---|---|---|
+| A Manuell per Datei | gering | 0 € | sehr hoch | hängt am Nutzer | ja |
+| B Server im Heimnetz | hoch | 0 € | sehr hoch | gering | **nein** |
+| C Cloud, Ende-zu-Ende | hoch | 0 € | hoch | gut | ja |
+| D Umstieg auf Obsidian | – | 0 € | mittel | mittel | ja |
+
+- **B verworfen:** scheitert an Grenze 2 (Zertifikat nötig), PC muss laufen,
+  funktioniert nur zu Hause.
+- **D nicht nötig:** Der ZIP-Export erzeugt bereits Obsidian-taugliche
+  Markdown-Dateien. Die Tür steht also offen, ohne jetzt zu wechseln.
+  (Obsidian ist seit Februar 2025 auch für die Arbeit kostenlos.)
+- **C vorgemerkt:** Cloudflare R2 bietet 10 GB kostenlos – für eine Person
+  weit ausreichend. Verschlüsselung im Browser, Anbieter sieht nur
+  Kauderwelsch. Offen: Passwort darf nie vergessen werden.
+
+**Entschieden:** in zwei Stufen. Stufe 1 (Datei) zuerst, Stufe 2 (Cloud)
+nur, wenn sich Stufe 1 als zu umständlich erweist.
+
+**Stufe 1 – Übertragen per Datei**
+- [x] Eigener Bildschirm „Übertragen" statt vergraben in den Einstellungen
+- [x] Gerätename (iPhone / PC), erscheint in Konflikt-Kopien
+- [x] **Konflikt-Sicherung:** Wurde dieselbe Notiz auf beiden Geräten seit
+      der letzten Übertragung geändert, gewinnt die neuere – die
+      unterlegene bleibt als Kopie „Titel (Konflikt vom PC, 11.10.)".
+      Es geht nie etwas verloren.
+- [x] Bericht nach dem Einlesen: neu / aktualisiert / unverändert / Konflikte
+- [x] „Zuletzt übertragen" sichtbar
+
+**Stufe 2 – Cloud, Ende-zu-Ende-verschlüsselt** (geplant, noch nicht gebaut)
+- [ ] Eigener Plan vor dem Bau: Verschlüsselung, Konfliktregeln, Passwort-Handhabung
+- [ ] Die Regeln aus `sync.js` werden wiederverwendet
 
 ### Optional später
 - [ ] Echte Push-Benachrichtigungen über einen kostenlosen Cloudflare Worker
@@ -147,6 +184,7 @@ Anderer Port, falls 8080 belegt ist: `.\serve.ps1 -Port 8081`
 | `db.js` | Speicherung in IndexedDB **(Migrationen hier!)** |
 | `markdown.js` | Markdown, `[[Links]]`, `#tags` |
 | `share.js` | Datei ans Teilen-Menü bzw. in den Download geben |
+| `sync.js` | Abgleich zweier Geräte **(Konfliktregeln hier)** |
 | `flashcards.js` | Karten aus `::`-Zeilen, Wiederholungsabstände (SM-2) |
 | `attachments.js` | Fotos verkleinern, PDFs, Sprachmemo-Aufnahme |
 | `backup.js` | Export JSON/ZIP, Import |
@@ -204,7 +242,9 @@ Auf dem iPhone installieren:
 - [x] Phase 2a umgesetzt und auf dem PC getestet (11.10.2026)
 - [x] Phase 2b umgesetzt und auf dem PC getestet (11.10.2026)
 - [ ] Phase 2 auf dem iPhone getestet (Kalender, Kamera, Mikrofon!)
-- [ ] Phase 3: Sync-Lösung entschieden
+- [x] Phase 3: Sync-Lösung entschieden (11.10.2026) – zweistufig
+- [x] Phase 3 Stufe 1 umgesetzt und auf dem PC getestet (11.10.2026)
+- [ ] Phase 3 Stufe 1 im Alltag erprobt – dann entscheiden, ob Stufe 2 nötig ist
 
-**Aktuelle Service-Worker-Version:** `v1.2.0`
-**Aktuelle Datenbank-Version:** `3`
+**Aktuelle Service-Worker-Version:** `v1.3.0`
+**Aktuelle Datenbank-Version:** `3` (unverändert – Stufe 1 brauchte keine Migration)
