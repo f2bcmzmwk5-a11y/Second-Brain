@@ -317,6 +317,57 @@ svg {
   font-size: 12px;
 }
 
+/* ---------- Wiedervorlage ---------- */
+
+.due-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.due-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.due-chip.due-overdue {
+  border-color: var(--danger);
+  background: transparent;
+  color: var(--danger);
+}
+
+/* Faellige Notizen auf der Startseite etwas hervorheben */
+.due-list .note-card { border-left: 3px solid var(--accent); }
+
+/* Zahl am Inbox-Tab */
+.tab { position: relative; }
+.badge {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  margin-left: 4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+
 /* ---------- Notiz-Detail ---------- */
 
 .note-title {
@@ -462,6 +513,11 @@ svg {
   cursor: pointer;
   display: grid;
   place-items: center;
+  /* Langes Druecken oeffnet die Vorlagen - iOS soll dabei weder Text
+     markieren noch sein eigenes Menue einblenden. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .fab:active { transform: scale(.94); }
 .fab svg { width: 28px; height: 28px; stroke-width: 2.4; }

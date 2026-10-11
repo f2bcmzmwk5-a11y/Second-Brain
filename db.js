@@ -12,7 +12,7 @@ window.DB = (function () {
   'use strict';
 
   var DB_NAME = 'second-brain';
-  var DB_VERSION = 1;
+  var DB_VERSION = 2;
 
   var SECTIONS = ['inbox', 'projekte', 'wissen', 'archiv'];
   var AREAS = ['arbeit', 'fachwirt', 'privat', 'ideen'];
@@ -24,9 +24,18 @@ window.DB = (function () {
     dbPromise = new Promise(function (resolve, reject) {
       var req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = function (e) {
-        migrate(req.result, e.oldVersion);
+        migrate(req.result, e.oldVersion, req.transaction);
       };
-      req.onsuccess = function () { resolve(req.result); };
+      req.onsuccess = function () {
+        var db = req.result;
+        // Wird die App in einem anderen Tab aktualisiert, muss diese
+        // Verbindung weichen - sonst blockiert sie die Migration.
+        db.onversionchange = function () {
+          db.close();
+          dbPromise = null;
+        };
+        resolve(db);
+      };
       req.onerror = function () { reject(req.error); };
       req.onblocked = function () {
         reject(new Error('Datenbank blockiert – bitte andere Tabs der App schliessen.'));
@@ -35,7 +44,7 @@ window.DB = (function () {
     return dbPromise;
   }
 
-  function migrate(db, oldVersion) {
+  function migrate(db, oldVersion, tx) {
     if (oldVersion < 1) {
       var notes = db.createObjectStore('notes', { keyPath: 'id' });
       notes.createIndex('titleKey', 'titleKey');
@@ -47,7 +56,16 @@ window.DB = (function () {
 
       db.createObjectStore('meta', { keyPath: 'key' });
     }
-    // if (oldVersion < 2) { ... hier spaetere Aenderungen ... }
+
+    if (oldVersion < 2) {
+      // Wiedervorlage: Feld "due" (Zeitstempel, 0:00 Uhr des Tages).
+      // Nur ein zusaetzlicher Index - vorhandene Notizen werden nicht
+      // angefasst. Notizen ohne Datum tauchen im Index gar nicht auf.
+      var store = tx.objectStore('notes');
+      if (!store.indexNames.contains('due')) store.createIndex('due', 'due');
+    }
+
+    // if (oldVersion < 3) { ... hier spaetere Aenderungen ... }
   }
 
   /* ---------- kleine Helfer um IndexedDB herum ---------- */
@@ -108,6 +126,9 @@ window.DB = (function () {
     if (!note.created) note.created = note.updated;
     if (SECTIONS.indexOf(note.section) === -1) note.section = 'inbox';
     if (note.area && AREAS.indexOf(note.area) === -1) note.area = '';
+    // Ungueltige Wiedervorlage ganz entfernen - IndexedDB kann null oder
+    // undefined nicht als Schluessel ablegen.
+    if (typeof note.due !== 'number' || !isFinite(note.due)) delete note.due;
     return note;
   }
 
@@ -205,6 +226,51 @@ window.DB = (function () {
         return bt - at || b.updated - a.updated;
       });
     });
+  }
+
+  /* ---------- Wiedervorlage ---------- */
+
+  // Wiedervorlagen sind tagesgenau: immer 0:00 Uhr des gewaehlten Tages.
+  function startOfDay(d) {
+    var x = new Date(d || Date.now());
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  }
+
+  function addDays(ts, n) {
+    var x = new Date(ts);
+    x.setDate(x.getDate() + n);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  }
+
+  // Ende des heutigen Tages - alles davor gilt als faellig.
+  function endOfToday() {
+    var x = new Date();
+    x.setHours(23, 59, 59, 999);
+    return x.getTime();
+  }
+
+  function dueNotes(until) {
+    var range = IDBKeyRange.upperBound(until == null ? endOfToday() : until);
+    return tx('notes').then(function (s) {
+      return wrap(s.index('due').getAll(range));
+    }).then(function (notes) {
+      // Archiviertes soll nicht mehr auf der Startseite auftauchen
+      return notes
+        .filter(function (n) { return n.section !== 'archiv'; })
+        .sort(function (a, b) { return a.due - b.due; });
+    });
+  }
+
+  function dueCount(until) {
+    return dueNotes(until).then(function (notes) { return notes.length; });
+  }
+
+  function setDue(note, ts) {
+    if (ts == null) delete note.due;
+    else note.due = startOfDay(ts);
+    return save(note);
   }
 
   /* ---------- Taegliche Notiz ---------- */
@@ -320,6 +386,12 @@ window.DB = (function () {
     AREAS: AREAS,
     titleKey: titleKey,
     dateTitle: dateTitle,
+    startOfDay: startOfDay,
+    addDays: addDays,
+    endOfToday: endOfToday,
+    dueNotes: dueNotes,
+    dueCount: dueCount,
+    setDue: setDue,
     blank: blank,
     create: create,
     save: save,

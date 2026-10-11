@@ -5,9 +5,8 @@
    ZIP   = eine .md-Datei pro Notiz (zum Lesen auf dem PC / in Obsidian)
            plus die JSON-Sicherung darin.
 
-   Auf dem iPhone funktioniert "Datei herunterladen" in einer installierten
-   PWA nicht zuverlaessig. Darum wird zuerst das Teilen-Menue benutzt
-   (dort: "In Dateien speichern").
+   Die Uebergabe der fertigen Datei (Teilen-Menue bzw. Download) steckt
+   in share.js und wird auch von der Kalender-Erinnerung benutzt.
    ========================================================================== */
 
 window.Backup = (function () {
@@ -16,47 +15,8 @@ window.Backup = (function () {
   var FORMAT = 1;
   var JSZIP_URL = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
 
-  function stamp() {
-    var d = new Date();
-    var p = function (n) { return String(n).padStart(2, '0'); };
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
-           '_' + p(d.getHours()) + p(d.getMinutes());
-  }
-
-  /* ---------- Datei an den Nutzer uebergeben ---------- */
-
-  function deliver(filename, blob) {
-    var file = null;
-    try {
-      file = new File([blob], filename, { type: blob.type });
-    } catch (e) { /* aeltere Browser kennen File() nicht */ }
-
-    // 1. Weg: Teilen-Menue (iPhone)
-    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-      return navigator.share({ files: [file], title: filename })
-        .then(function () { return 'geteilt'; })
-        .catch(function (err) {
-          if (err && err.name === 'AbortError') return 'abgebrochen';
-          return download(filename, blob);
-        });
-    }
-
-    // 2. Weg: normaler Download (PC)
-    return Promise.resolve(download(filename, blob));
-  }
-
-  function download(filename, blob) {
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 20000);
-    return 'gespeichert';
-  }
+  var deliver = ShareFile.deliver;
+  var stamp = ShareFile.stamp;
 
   /* ---------- JSON-Export ---------- */
 
@@ -109,15 +69,9 @@ window.Backup = (function () {
     });
   }
 
-  // Dateinamen muessen auf Windows und Mac funktionieren.
   function safeName(title, id) {
-    var base = String(title || 'ohne-titel')
-      .replace(/[\\/:*?"<>|#\n\r\t]/g, '-')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 80);
-    if (!base || base === '-') base = 'ohne-titel';
-    return base + ' (' + String(id).slice(0, 6) + ').md';
+    return ShareFile.safeName(title, 'ohne-titel') +
+           ' (' + String(id).slice(0, 6) + ').md';
   }
 
   function toMarkdownFile(note) {
@@ -127,6 +81,7 @@ window.Backup = (function () {
       'bereich: ' + (note.section || 'inbox'),
       'lebensbereich: ' + (note.area || ''),
       'tags: [' + (note.tags || []).join(', ') + ']',
+      'wiedervorlage: ' + (note.due ? new Date(note.due).toISOString().slice(0, 10) : ''),
       'erstellt: ' + new Date(note.created || Date.now()).toISOString(),
       'geaendert: ' + new Date(note.updated || Date.now()).toISOString(),
       'id: ' + note.id,
@@ -194,7 +149,7 @@ window.Backup = (function () {
     var created = Number(raw.created) || Date.now();
     var updated = Number(raw.updated) || created;
 
-    return {
+    var note = {
       id: id,
       title: title,
       titleKey: DB.titleKey(title),
@@ -206,6 +161,13 @@ window.Backup = (function () {
       created: created,
       updated: updated
     };
+
+    // Wiedervorlage nur uebernehmen, wenn sie ein gueltiges Datum ist
+    if (typeof raw.due === 'number' && isFinite(raw.due)) {
+      note.due = DB.startOfDay(raw.due);
+    }
+
+    return note;
   }
 
   // Liest die Datei und prueft sie, ohne etwas zu speichern.

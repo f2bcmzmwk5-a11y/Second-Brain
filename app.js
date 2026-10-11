@@ -92,6 +92,31 @@
     });
   }
 
+  // Wiedervorlage menschlich benennen: Heute / Morgen / Überfällig / Datum
+  function formatDue(ts) {
+    var heute = DB.startOfDay(Date.now());
+    var tage = Math.round((DB.startOfDay(ts) - heute) / 86400000);
+
+    if (tage < 0) return { text: tage === -1 ? 'Gestern fällig' : 'Überfällig', overdue: true };
+    if (tage === 0) return { text: 'Heute', overdue: false };
+    if (tage === 1) return { text: 'Morgen', overdue: false };
+    if (tage < 7) return { text: 'In ' + tage + ' Tagen', overdue: false };
+
+    return {
+      text: new Date(ts).toLocaleDateString('de-DE', {
+        day: '2-digit', month: '2-digit', year: '2-digit'
+      }),
+      overdue: false
+    };
+  }
+
+  // Datum als JJJJ-MM-TT fuer <input type="date">
+  function toDateInput(ts) {
+    var d = new Date(ts);
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
   function formatBytes(n) {
     if (n == null) return '–';
     if (n < 1024) return n + ' B';
@@ -182,6 +207,13 @@
     var title = note.title.trim() || '(ohne Titel)';
 
     var foot = [];
+    if (note.due) {
+      var due = formatDue(note.due);
+      foot.push(el('span', {
+        class: 'due-chip' + (due.overdue ? ' due-overdue' : ''),
+        text: due.text
+      }));
+    }
     if (note.area) {
       foot.push(el('span', {
         class: 'area-dot area-' + note.area,
@@ -216,6 +248,21 @@
     return el('div', { class: 'note-list' }, notes.map(noteCard));
   }
 
+  // Kleine Zahl am Inbox-Tab, wenn etwas faellig ist
+  function updateDueBadge() {
+    return DB.dueCount().then(function (n) {
+      var tab = document.querySelector('.tab[data-tab="inbox"]');
+      if (!tab) return;
+      var badge = tab.querySelector('.badge');
+      if (!n) { if (badge) badge.remove(); return; }
+      if (!badge) {
+        badge = el('span', { class: 'badge' });
+        tab.appendChild(badge);
+      }
+      badge.textContent = n > 9 ? '9+' : String(n);
+    }).catch(function () { /* Zaehler ist nicht kritisch */ });
+  }
+
   function areaChips(onChange) {
     var row = el('div', { class: 'chips', role: 'group', 'aria-label': 'Lebensbereich' });
     var options = [{ id: '', label: 'Alle' }].concat(
@@ -237,10 +284,29 @@
     backBtn.hidden = true;
     fab.hidden = false;
 
-    return DB.listSection(section, areaFilter).then(function (notes) {
+    // Die Inbox ist die Startseite und zeigt oben die faelligen Notizen.
+    var dueP = section === 'inbox' ? DB.dueNotes() : Promise.resolve([]);
+
+    return Promise.all([DB.listSection(section, areaFilter), dueP]).then(function (res) {
+      var notes = res[0];
+      var due = res[1];
+
       clear(view);
 
       if (section === 'inbox') {
+        if (due.length) {
+          var ueberfaellig = due.filter(function (n) {
+            return DB.startOfDay(n.due) < DB.startOfDay(Date.now());
+          }).length;
+
+          view.appendChild(el('div', {
+            class: 'section-head',
+            text: 'Fällig (' + due.length + ')' +
+                  (ueberfaellig ? ' · ' + ueberfaellig + ' überfällig' : '')
+          }));
+          view.appendChild(el('div', { class: 'note-list due-list' }, due.map(noteCard)));
+        }
+
         view.appendChild(el('div', { class: 'btn-row' }, [
           el('button', { class: 'btn', type: 'button', onclick: openDaily }, [
             el('span', { text: 'Tägliche Notiz' })
@@ -249,6 +315,10 @@
             el('span', { text: 'Aus Zwischenablage' })
           ])
         ]));
+
+        if (due.length) {
+          view.appendChild(el('div', { class: 'section-head', text: 'Alle Notizen' }));
+        }
       }
 
       view.appendChild(areaChips(function () { renderSection(section); }));
@@ -388,8 +458,15 @@
         autocomplete: 'off'
       });
 
-      /* --- Zeile mit Bereich, Datum --- */
+      /* --- Zeile mit Bereich, Datum, Wiedervorlage --- */
+      var dueInfo = note.due ? formatDue(note.due) : null;
       var meta = el('div', { class: 'note-meta' }, [
+        dueInfo ? el('button', {
+          class: 'due-chip' + (dueInfo.overdue ? ' due-overdue' : ''),
+          type: 'button',
+          title: 'Wiedervorlage ändern',
+          onclick: function () { dueMenu(note); }
+        }, ['Fällig: ' + dueInfo.text]) : null,
         note.area ? el('span', {
           class: 'area-dot area-' + note.area, text: AREA_LABEL[note.area]
         }) : null,
@@ -531,6 +608,107 @@
 
   var currentNoteMenu = null;
 
+  /* ---------- Wiedervorlage ---------- */
+
+  function dueMenu(note) {
+    var heute = DB.startOfDay(Date.now());
+
+    var auswahl = [
+      { label: 'Heute', ts: heute },
+      { label: 'Morgen', ts: DB.addDays(heute, 1) },
+      { label: 'In 3 Tagen', ts: DB.addDays(heute, 3) },
+      { label: 'Nächste Woche', ts: DB.addDays(heute, 7) }
+    ].map(function (opt) {
+      return {
+        label: opt.label + ' · ' + new Date(opt.ts).toLocaleDateString('de-DE', {
+          weekday: 'short', day: '2-digit', month: '2-digit'
+        }),
+        pressed: note.due === opt.ts,
+        onClick: function () { applyDue(note, opt.ts); }
+      };
+    });
+
+    auswahl.push({
+      label: 'Datum wählen …',
+      onClick: function () { dateSheet(note); }
+    });
+
+    var gruppen = [{ label: 'Wiedervorlage', items: auswahl }];
+
+    if (note.due) {
+      gruppen.push({
+        items: [
+          {
+            label: 'Im Kalender erinnern',
+            onClick: function () { sendToCalendar(note); }
+          },
+          {
+            label: 'Wiedervorlage entfernen',
+            danger: true,
+            onClick: function () { applyDue(note, null); }
+          }
+        ]
+      });
+    }
+
+    openSheet(note.title.trim() || 'Notiz', gruppen);
+  }
+
+  function applyDue(note, ts) {
+    DB.setDue(note, ts).then(function () {
+      toast(ts ? 'Fällig ' + formatDue(ts).text.toLowerCase() : 'Wiedervorlage entfernt');
+      updateDueBadge();
+      render();
+    }).catch(function (err) {
+      console.error(err);
+      toast('Konnte nicht gespeichert werden');
+    });
+  }
+
+  // Eigenes Blatt mit Datumsfeld – funktioniert auf iPhone und PC gleich.
+  function dateSheet(note) {
+    clear(sheet);
+    sheet.appendChild(el('h2', { text: 'Datum wählen' }));
+
+    var field = el('input', {
+      class: 'search-field',
+      type: 'date',
+      value: toDateInput(note.due || Date.now()),
+      min: toDateInput(Date.now())
+    });
+    sheet.appendChild(field);
+
+    sheet.appendChild(el('button', {
+      class: 'sheet-item', type: 'button',
+      onclick: function () {
+        var parts = field.value.split('-');
+        if (parts.length !== 3) { toast('Kein gültiges Datum'); return; }
+        // Monat ist bei new Date() nullbasiert
+        var ts = new Date(+parts[0], +parts[1] - 1, +parts[2]).getTime();
+        if (!isFinite(ts)) { toast('Kein gültiges Datum'); return; }
+        closeSheet();
+        applyDue(note, ts);
+      }
+    }, ['Übernehmen']));
+
+    sheet.appendChild(el('button', {
+      class: 'sheet-item', type: 'button', onclick: closeSheet
+    }, ['Abbrechen']));
+
+    sheetWrap.hidden = false;
+    setTimeout(function () { field.focus(); }, 80);
+  }
+
+  function sendToCalendar(note) {
+    Reminders.share(note).then(function (how) {
+      if (how === 'abgebrochen') toast('Abgebrochen');
+      else toast('Termin um ' + Reminders.ALARM_HOUR + ':00 Uhr erstellt');
+    }).catch(function (err) {
+      console.error(err);
+      alert('Kalender-Datei konnte nicht erstellt werden:\n\n' + (err.message || err));
+    });
+  }
+
   function noteMenu(note, flush) {
     openSheet(note.title.trim() || 'Notiz', [
       {
@@ -563,6 +741,27 @@
             }
           };
         })
+      },
+      {
+        label: 'Wiedervorlage',
+        items: [
+          {
+            label: note.due ? 'Fällig: ' + formatDue(note.due).text + ' – ändern'
+                            : 'Wiedervorlage setzen …',
+            onClick: function () { dueMenu(note); }
+          },
+          {
+            label: 'Im Kalender erinnern',
+            onClick: function () {
+              if (!note.due) {
+                toast('Erst eine Wiedervorlage setzen');
+                setTimeout(function () { dueMenu(note); }, 900);
+                return;
+              }
+              sendToCalendar(note);
+            }
+          }
+        ]
       },
       {
         label: 'Mehr',
@@ -633,6 +832,61 @@
   function newNote() {
     DB.create({ section: currentSection(), area: areaFilter || '' })
       .then(function (note) { go('#/note/' + note.id); });
+  }
+
+  /* ---------- Vorlagen ---------- */
+
+  function templateSheet() {
+    openSheet('Neue Notiz', [{
+      label: 'Vorlage wählen',
+      items: [{ label: 'Leere Notiz', onClick: newNote }].concat(
+        Templates.list.map(function (tpl) {
+          return {
+            label: tpl.label,
+            onClick: function () { newFromTemplate(tpl.id); }
+          };
+        })
+      )
+    }]);
+  }
+
+  function newFromTemplate(id) {
+    var fields = Templates.build(id, areaFilter);
+    if (!fields) { toast('Vorlage nicht gefunden'); return; }
+    DB.create(fields).then(function (note) {
+      go('#/note/' + note.id);
+    });
+  }
+
+  // Plus-Knopf: kurz tippen = leere Notiz, lange druecken = Vorlagen
+  function setupFab() {
+    var timer = null;
+    var longPress = false;
+
+    function start() {
+      longPress = false;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        longPress = true;
+        if (navigator.vibrate) navigator.vibrate(12);
+        templateSheet();
+      }, 500);
+    }
+
+    function cancel() { clearTimeout(timer); }
+
+    fab.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+      fab.addEventListener(ev, cancel);
+    });
+
+    // Das iPhone zeigt beim langen Druecken sonst sein eigenes Menue
+    fab.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+    fab.addEventListener('click', function () {
+      if (longPress) { longPress = false; return; }
+      newNote();
+    });
   }
 
   function openDaily() {
@@ -889,9 +1143,10 @@
     }
     openSheet('Menü', [{
       items: [
-        { label: 'Einstellungen & Backup', onClick: function () { go('#/einstellungen'); } },
+        { label: 'Neu aus Vorlage …', onClick: templateSheet },
         { label: 'Tägliche Notiz', onClick: openDaily },
-        { label: 'Aus Zwischenablage einfügen', onClick: pasteFromClipboard }
+        { label: 'Aus Zwischenablage einfügen', onClick: pasteFromClipboard },
+        { label: 'Einstellungen & Backup', onClick: function () { go('#/einstellungen'); } }
       ]
     }]);
   });
@@ -901,7 +1156,7 @@
     else go('#/inbox');
   });
 
-  fab.addEventListener('click', newNote);
+  setupFab();
 
   /* ====================================================================
      Router
@@ -924,6 +1179,7 @@
       active ? tab.setAttribute('aria-current', 'page') : tab.removeAttribute('aria-current');
     });
 
+    updateDueBadge();
     window.scrollTo(0, 0);
 
     var done;

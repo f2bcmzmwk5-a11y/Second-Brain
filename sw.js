@@ -6,7 +6,7 @@
    Dateien aus dem Zwischenspeicher.
    ========================================================================== */
 
-var VERSION = 'v1.0.1';
+var VERSION = 'v1.1.0';
 var CACHE = 'second-brain-' + VERSION;
 
 // Eigene Dateien – muessen alle vorhanden sein.
@@ -16,7 +16,10 @@ var APP_FILES = [
   './style.css',
   './db.js',
   './markdown.js',
+  './share.js',
   './backup.js',
+  './templates.js',
+  './reminders.js',
   './app.js',
   './manifest.json',
   './icons/apple-touch-icon.png',

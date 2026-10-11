@@ -68,13 +68,12 @@ den Bereichen, Speicheranzeige, Hinweis auf neue App-Version.
 ### Phase 2 – Ausbau
 
 **Phase 2a – Alltag**
-- [ ] Vorlagen: Projekt, Gesprächsnotiz, Lernkarte (`{{date}}`, `{{title}}` ersetzen);
-      Plus-Button lange drücken öffnet die Auswahl
-- [ ] Wiedervorlage mit Fälligkeitsdatum (**nur Datum, keine Uhrzeit**),
-      Startseite zeigt „Heute fällig“
-- [ ] Erinnerungen: Button „Im Kalender erinnern“ erzeugt `.ics`-Datei mit Alarm
+- [x] Vorlagen: Projekt, Gesprächsnotiz, Lernkarte (`{{date}}`, `{{time}}`, `{{title}}`);
+      Plus-Button lange drücken öffnet die Auswahl, zusätzlich im ⋯-Menü
+- [x] Wiedervorlage mit Fälligkeitsdatum (**nur Datum, keine Uhrzeit**),
+      Startseite zeigt die fälligen Notizen, Zähler am Inbox-Tab
+- [x] Erinnerungen: Button „Im Kalender erinnern“ erzeugt `.ics`-Datei mit Alarm
       um **9:00 Uhr** (Titel = Notiztitel, Link zur Notiz in der Beschreibung)
-      – nur in der installierten App testbar
 
 **Phase 2b – Lernen und Medien**
 - [ ] Lernkarten: **mehrere Karten pro Notiz, Trennzeichen `::`**
@@ -142,7 +141,10 @@ Anderer Port, falls 8080 belegt ist: `.\serve.ps1 -Port 8081`
 | `style.css` | Aussehen, Hell/Dunkel, iPhone-Abstände |
 | `db.js` | Speicherung in IndexedDB **(Migrationen hier!)** |
 | `markdown.js` | Markdown, `[[Links]]`, `#tags` |
+| `share.js` | Datei ans Teilen-Menü bzw. in den Download geben |
 | `backup.js` | Export JSON/ZIP, Import |
+| `templates.js` | Vorlagen **(neue Vorlage hier ergänzen)** |
+| `reminders.js` | Kalender-Erinnerung als `.ics` |
 | `app.js` | Oberfläche, Navigation, Editor |
 | `sw.js` | Offline-Betrieb **(Version hochzählen!)** |
 | `serve.ps1` | Testserver für Windows |
@@ -189,8 +191,10 @@ Auf dem iPhone installieren:
 - [x] Veröffentlicht auf GitHub Pages (11.10.2026)
 - [x] Phase 1 auf dem iPhone installiert und getestet (11.10.2026)
 - [x] Phase 2 geplant und entschieden (siehe Phase 2a / 2b oben)
-- [ ] Phase 2a umgesetzt
+- [x] Phase 2a umgesetzt und auf dem PC getestet (11.10.2026)
+- [ ] Phase 2a auf dem iPhone getestet (Kalender-Erinnerung!)
 - [ ] Phase 2b umgesetzt
 - [ ] Phase 3: Sync-Lösung entschieden
 
-**Aktuelle Service-Worker-Version:** `v1.0.1`
+**Aktuelle Service-Worker-Version:** `v1.1.0`
+**Aktuelle Datenbank-Version:** `2`
