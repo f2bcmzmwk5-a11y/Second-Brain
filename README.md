@@ -186,9 +186,11 @@ Auf dem iPhone installieren:
 
 - [x] Phase 1 geplant
 - [x] Phase 1 umgesetzt und auf dem PC getestet (10.10.2026)
-- [ ] Phase 1 auf dem iPhone getestet
-- [ ] Phase 2 geplant
-- [ ] Phase 2 umgesetzt
+- [x] Veröffentlicht auf GitHub Pages (11.10.2026)
+- [x] Phase 1 auf dem iPhone installiert und getestet (11.10.2026)
+- [x] Phase 2 geplant und entschieden (siehe Phase 2a / 2b oben)
+- [ ] Phase 2a umgesetzt
+- [ ] Phase 2b umgesetzt
 - [ ] Phase 3: Sync-Lösung entschieden
 
 **Aktuelle Service-Worker-Version:** `v1.0.1`
