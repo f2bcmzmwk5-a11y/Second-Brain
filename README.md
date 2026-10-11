@@ -4,6 +4,8 @@ Persönliche Second-Brain-App als **PWA (Progressive Web App)**.
 Läuft auf dem iPhone wie eine echte App (über „Zum Home-Bildschirm“), funktioniert offline
 und speichert alle Daten **lokal auf dem Gerät**.
 
+**➜ https://f2bcmzmwk5-a11y.github.io/Second-Brain/**
+
 - **Entwicklung:** Windows-PC mit Claude Code
 - **Hosting:** GitHub Pages (dort liegt nur der Code, keine Notizen)
 - **Sprache der Oberfläche:** Deutsch
@@ -147,10 +149,21 @@ Anderer Port, falls 8080 belegt ist: `.\serve.ps1 -Port 8081`
 
 ## Veröffentlichen & installieren
 
-1. GitHub-Repository anlegen, Code hochladen
-2. GitHub Pages aktivieren
-3. Auf dem iPhone die Seite in **Safari** öffnen → Teilen → **„Zum Home-Bildschirm“**
-4. Ab jetzt nur noch über das Home-Bildschirm-Symbol öffnen
+Repository und GitHub Pages sind eingerichtet. Neue Änderungen hochladen:
+
+```
+git add -A
+git commit -m "Was geändert wurde"
+git push
+```
+
+Nach ein bis zwei Minuten ist die neue Fassung unter
+https://f2bcmzmwk5-a11y.github.io/Second-Brain/ live.
+
+Auf dem iPhone installieren:
+1. Adresse in **Safari** öffnen (nicht Chrome – dort fehlt „Zum Home-Bildschirm“)
+2. Teilen-Symbol → **„Zum Home-Bildschirm“**
+3. Ab jetzt nur noch über das Home-Bildschirm-Symbol öffnen
    (Safari und installierte App haben **getrennte** Speicher!)
 
 ## Updates einspielen
