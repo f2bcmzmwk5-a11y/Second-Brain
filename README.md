@@ -76,19 +76,24 @@ den Bereichen, Speicheranzeige, Hinweis auf neue App-Version.
       um **9:00 Uhr** (Titel = Notiztitel, Link zur Notiz in der Beschreibung)
 
 **Phase 2b – Lernen und Medien**
-- [ ] Lernkarten: **mehrere Karten pro Notiz, Trennzeichen `::`**
+- [x] Lernkarten: **mehrere Karten pro Notiz, Trennzeichen `::`**
       (`Deckungsbeitrag :: Umsatz minus variable Kosten`).
       Antwort erst nach Tippen, Bewertung Nochmal / Schwer / Gut / Leicht,
       vereinfachtes SM-2, Anzeige „X Karten heute fällig“
-- [ ] Anhänge: Fotos (Kamera/Mediathek) und PDFs; Bilder vor dem Speichern verkleinern
-- [ ] Sprachmemos als Anhang (MediaRecorder); Diktat als Text über iPhone-Tastatur
-      → Eingabefelder groß gestalten
-- [ ] **ZIP wird Vollbackup:** Anhänge mitsichern **und Import auch aus ZIP.**
-      JSON bleibt, warnt aber, dass Anhänge fehlen
+- [x] Anhänge: Fotos (Kamera/Mediathek) und PDFs; Bilder auf 1600 px verkleinert
+- [x] Sprachmemos als Anhang (MediaRecorder); Diktat als Text über iPhone-Tastatur
+- [x] **ZIP ist das Vollbackup:** Notizen, Lernstand und Anhänge,
+      Import auch aus ZIP. JSON bleibt, enthält aber keine Anhang-Dateien
 - [x] Speicherverbrauch in den Einstellungen anzeigen *(schon in Phase 1 erledigt)*
 
-**Technisch:** Datenbank auf Version 2 (neue Speicher `anhaenge` und `karten`,
-Feld `due`) – rein ergänzend, bestehende Notizen werden nicht umgeschrieben.
+**So entstehen Lernkarten:** Jede Zeile mit `::` in einer Notiz wird eine Karte.
+Der Lernstand hängt an der **Vorderseite** – die Rückseite ändern ist gefahrlos,
+die Karte behält ihren Rhythmus. Wird die Vorderseite geändert, zählt sie als
+neue Karte.
+
+**Technisch:** Datenbank-Version 2 brachte das Feld `due` (Wiedervorlage),
+Version 3 die Speicher `cards` und `attachments` – jeweils rein ergänzend,
+bestehende Notizen werden nicht umgeschrieben.
 
 **Grenze der Kalender-Erinnerung:** Die `.ics` erzeugt einen einmaligen
 Kalendereintrag. Wird die Wiedervorlage später in der App geändert, ändert sich
@@ -142,9 +147,12 @@ Anderer Port, falls 8080 belegt ist: `.\serve.ps1 -Port 8081`
 | `db.js` | Speicherung in IndexedDB **(Migrationen hier!)** |
 | `markdown.js` | Markdown, `[[Links]]`, `#tags` |
 | `share.js` | Datei ans Teilen-Menü bzw. in den Download geben |
+| `flashcards.js` | Karten aus `::`-Zeilen, Wiederholungsabstände (SM-2) |
+| `attachments.js` | Fotos verkleinern, PDFs, Sprachmemo-Aufnahme |
 | `backup.js` | Export JSON/ZIP, Import |
 | `templates.js` | Vorlagen **(neue Vorlage hier ergänzen)** |
 | `reminders.js` | Kalender-Erinnerung als `.ics` |
+| `learn.js` | Lernmodus |
 | `app.js` | Oberfläche, Navigation, Editor |
 | `sw.js` | Offline-Betrieb **(Version hochzählen!)** |
 | `serve.ps1` | Testserver für Windows |
@@ -181,6 +189,8 @@ Auf dem iPhone installieren:
 - Die Notizen liegen **nur** auf dem iPhone (in der installierten App).
 - **App vom Home-Bildschirm löschen = Daten weg.** Vorher immer exportieren.
 - Regelmäßig Backup (ZIP) exportieren und auf PC oder USB-Stick sichern.
+- **Für die Sicherung immer ZIP nehmen.** Nur das ZIP enthält Fotos,
+  PDFs und Sprachmemos. JSON hat Notizen und Lernstand, aber keine Anhänge.
 
 ---
 
@@ -192,9 +202,9 @@ Auf dem iPhone installieren:
 - [x] Phase 1 auf dem iPhone installiert und getestet (11.10.2026)
 - [x] Phase 2 geplant und entschieden (siehe Phase 2a / 2b oben)
 - [x] Phase 2a umgesetzt und auf dem PC getestet (11.10.2026)
-- [ ] Phase 2a auf dem iPhone getestet (Kalender-Erinnerung!)
-- [ ] Phase 2b umgesetzt
+- [x] Phase 2b umgesetzt und auf dem PC getestet (11.10.2026)
+- [ ] Phase 2 auf dem iPhone getestet (Kalender, Kamera, Mikrofon!)
 - [ ] Phase 3: Sync-Lösung entschieden
 
-**Aktuelle Service-Worker-Version:** `v1.1.0`
-**Aktuelle Datenbank-Version:** `2`
+**Aktuelle Service-Worker-Version:** `v1.2.0`
+**Aktuelle Datenbank-Version:** `3`

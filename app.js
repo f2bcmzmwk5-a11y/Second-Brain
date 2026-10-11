@@ -286,14 +286,26 @@
 
     // Die Inbox ist die Startseite und zeigt oben die faelligen Notizen.
     var dueP = section === 'inbox' ? DB.dueNotes() : Promise.resolve([]);
+    var cardsP = section === 'inbox' ? DB.dueCardCount() : Promise.resolve(0);
 
-    return Promise.all([DB.listSection(section, areaFilter), dueP]).then(function (res) {
+    return Promise.all([DB.listSection(section, areaFilter), dueP, cardsP]).then(function (res) {
       var notes = res[0];
       var due = res[1];
+      var faelligeKarten = res[2];
 
       clear(view);
 
       if (section === 'inbox') {
+        if (faelligeKarten) {
+          view.appendChild(el('a', {
+            class: 'learn-banner',
+            href: '#/lernen'
+          }, [
+            el('strong', { text: faelligeKarten + (faelligeKarten === 1 ? ' Karte' : ' Karten') + ' heute fällig' }),
+            el('span', { class: 'small', text: 'Lernen starten' })
+          ]));
+        }
+
         if (due.length) {
           var ueberfaellig = due.filter(function (n) {
             return DB.startOfDay(n.due) < DB.startOfDay(Date.now());
@@ -408,6 +420,17 @@
         text: notes.length + (notes.length === 1 ? ' Treffer' : ' Treffer')
       }));
       target.appendChild(noteListEl(notes, 'Keine Treffer', 'Anderes Wort versuchen.'));
+    });
+  }
+
+  function renderLearn() {
+    titleEl.textContent = 'Lernen';
+    backBtn.hidden = false;
+    fab.hidden = true;
+    clear(view);
+
+    return Learn.render(view, {
+      el: el, clear: clear, toast: toast, go: go
     });
   }
 
@@ -596,6 +619,7 @@
       view.appendChild(segmented);
       view.appendChild(editor);
       view.appendChild(previewBox);
+      view.appendChild(attachmentsBlock(note));
       view.appendChild(backlinksBox);
 
       applyMode();
@@ -607,6 +631,232 @@
   }
 
   var currentNoteMenu = null;
+
+  /* ====================================================================
+     Anhaenge
+     ==================================================================== */
+
+  // Adressen fuer Blobs muessen wieder freigegeben werden, sonst
+  // belegen sie Speicher bis zum Neuladen.
+  var objectUrls = [];
+
+  function blobUrl(blob) {
+    var url = URL.createObjectURL(blob);
+    objectUrls.push(url);
+    return url;
+  }
+
+  function releaseUrls() {
+    objectUrls.forEach(function (u) { URL.revokeObjectURL(u); });
+    objectUrls = [];
+  }
+
+  function attachmentsBlock(note) {
+    var box = el('div');
+
+    var fileInput = el('input', {
+      type: 'file',
+      accept: 'image/*,application/pdf',
+      multiple: true,
+      hidden: true
+    });
+    fileInput.addEventListener('change', function () {
+      var files = fileInput.files;
+      if (!files || !files.length) return;
+      toast(files.length === 1 ? 'Wird hinzugefügt …' : files.length + ' Dateien …');
+      Attachments.addMany(note.id, files).then(function (n) {
+        fileInput.value = '';
+        if (n) toast(n === 1 ? 'Angehängt' : n + ' angehängt');
+        draw();
+      }).catch(function (err) {
+        console.error(err);
+        fileInput.value = '';
+        alert('Anhängen fehlgeschlagen:\n\n' + (err.message || err));
+      });
+    });
+
+    function draw() {
+      clear(box);
+      box.appendChild(fileInput);
+
+      DB.attachmentsForNote(note.id).then(function (liste) {
+        box.appendChild(el('div', {
+          class: 'section-head',
+          text: liste.length ? 'Anhänge (' + liste.length + ')' : 'Anhänge'
+        }));
+
+        if (liste.length) {
+          var bilder = liste.filter(function (a) { return Attachments.isImage(a.type); });
+          var rest = liste.filter(function (a) { return !Attachments.isImage(a.type); });
+
+          if (bilder.length) {
+            box.appendChild(el('div', { class: 'thumbs' }, bilder.map(function (a) {
+              return el('button', {
+                class: 'thumb', type: 'button',
+                onclick: function () { attachmentMenu(a, draw); }
+              }, [
+                el('img', { src: blobUrl(a.blob), alt: a.name, loading: 'lazy' })
+              ]);
+            })));
+          }
+
+          rest.forEach(function (a) {
+            box.appendChild(attachmentRow(a, draw));
+          });
+        }
+
+        var knoepfe = [
+          el('button', {
+            class: 'btn', type: 'button',
+            onclick: function () { fileInput.click(); }
+          }, [el('span', { text: 'Foto / Datei' })])
+        ];
+
+        if (Attachments.canRecord()) {
+          knoepfe.push(el('button', {
+            class: 'btn', type: 'button',
+            onclick: function () { recordSheet(note, draw); }
+          }, [el('span', { text: 'Sprachmemo' })]));
+        }
+
+        box.appendChild(el('div', { class: 'btn-row attach-actions' }, knoepfe));
+      });
+    }
+
+    draw();
+    return box;
+  }
+
+  function attachmentRow(att, onChange) {
+    var inhalt = [
+      el('div', { class: 'attach-info' }, [
+        el('div', { class: 'attach-name', text: att.name }),
+        el('div', { class: 'small muted', text: Attachments.formatBytes(att.size) })
+      ])
+    ];
+
+    if (Attachments.isAudio(att.type)) {
+      var player = el('audio', { controls: true, preload: 'none', src: blobUrl(att.blob) });
+      inhalt.push(player);
+    }
+
+    inhalt.push(el('button', {
+      class: 'attach-more', type: 'button', 'aria-label': 'Mehr',
+      onclick: function () { attachmentMenu(att, onChange); }
+    }, ['⋯']));
+
+    return el('div', { class: 'attach-row' }, inhalt);
+  }
+
+  function attachmentMenu(att, onChange) {
+    var items = [];
+
+    if (Attachments.isImage(att.type) || Attachments.isPdf(att.type)) {
+      items.push({
+        label: 'Öffnen',
+        onClick: function () { window.open(blobUrl(att.blob), '_blank', 'noopener'); }
+      });
+    }
+
+    items.push({
+      label: 'Teilen / Speichern',
+      onClick: function () {
+        ShareFile.deliver(att.name, att.blob).then(function (how) {
+          if (how !== 'abgebrochen') toast('Weitergegeben');
+        }).catch(function () { toast('Teilen nicht möglich'); });
+      }
+    });
+
+    items.push({
+      label: 'Anhang löschen',
+      danger: true,
+      onClick: function () {
+        if (!confirm('„' + att.name + '“ wirklich löschen?')) return;
+        DB.deleteAttachment(att.id).then(function () {
+          toast('Gelöscht');
+          onChange();
+        });
+      }
+    });
+
+    openSheet(att.name, [{
+      label: Attachments.formatBytes(att.size),
+      items: items
+    }]);
+  }
+
+  // Aufnahme-Blatt fuer Sprachmemos
+  function recordSheet(note, onChange) {
+    clear(sheet);
+    sheet.appendChild(el('h2', { text: 'Sprachmemo' }));
+
+    var zeit = el('div', { class: 'record-time', text: '0:00' });
+    var punkt = el('div', { class: 'record-dot' });
+    sheet.appendChild(el('div', { class: 'record-box' }, [punkt, zeit]));
+
+    var hinweis = el('p', { class: 'hint', text: 'Mikrofon wird angefragt …' });
+    sheet.appendChild(hinweis);
+
+    var stopBtn = el('button', {
+      class: 'sheet-item', type: 'button', disabled: true
+    }, ['Aufnahme beenden']);
+    var abbrechen = el('button', { class: 'sheet-item', type: 'button' }, ['Abbrechen']);
+    sheet.appendChild(stopBtn);
+    sheet.appendChild(abbrechen);
+    sheetWrap.hidden = false;
+
+    var ticker = null;
+    var aufnahme = null;
+    var beendet = false;
+
+    function aufraeumen() {
+      clearInterval(ticker);
+      sheetWrap.hidden = true;
+    }
+
+    abbrechen.addEventListener('click', function () {
+      beendet = true;
+      if (aufnahme) aufnahme.cancel();
+      aufraeumen();
+    });
+
+    Attachments.startRecording().then(function (rec) {
+      if (beendet) { rec.cancel(); return; }
+      aufnahme = rec;
+      hinweis.textContent = 'Läuft – zum Beenden antippen.';
+      punkt.classList.add('is-live');
+      stopBtn.disabled = false;
+
+      ticker = setInterval(function () {
+        var s = rec.seconds();
+        zeit.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      }, 250);
+
+      stopBtn.addEventListener('click', function () {
+        if (beendet) return;
+        beendet = true;
+        clearInterval(ticker);
+        stopBtn.disabled = true;
+        hinweis.textContent = 'Wird gespeichert …';
+
+        rec.stop().then(function (file) {
+          return Attachments.add(note.id, file);
+        }).then(function (res) {
+          aufraeumen();
+          if (res) { toast('Sprachmemo gespeichert'); onChange(); }
+        }).catch(function (err) {
+          console.error(err);
+          aufraeumen();
+          alert('Aufnahme fehlgeschlagen:\n\n' + (err.message || err));
+        });
+      });
+    }).catch(function (err) {
+      console.error(err);
+      aufraeumen();
+      alert('Mikrofon nicht verfügbar:\n\n' + (err.message || err) +
+            '\n\nIn den iPhone-Einstellungen unter Safari den Mikrofonzugriff erlauben.');
+    });
+  }
 
   /* ---------- Wiedervorlage ---------- */
 
@@ -948,16 +1198,16 @@
     view.appendChild(el('div', { class: 'btn-row' }, [
       el('button', {
         class: 'btn btn-primary', type: 'button',
-        onclick: function (e) { runExport(e.currentTarget, Backup.exportJson, 'JSON'); }
-      }, [el('span', { text: 'Export JSON' })]),
+        onclick: function (e) { runExport(e.currentTarget, Backup.exportZip, 'ZIP'); }
+      }, [el('span', { text: 'Export ZIP' })]),
       el('button', {
         class: 'btn', type: 'button',
-        onclick: function (e) { runExport(e.currentTarget, Backup.exportZip, 'ZIP'); }
-      }, [el('span', { text: 'Export ZIP' })])
+        onclick: function (e) { runExport(e.currentTarget, Backup.exportJson, 'JSON'); }
+      }, [el('span', { text: 'Nur JSON' })])
     ]));
 
     var fileInput = el('input', {
-      type: 'file', accept: '.json,application/json', hidden: true
+      type: 'file', accept: '.zip,.json,application/zip,application/json', hidden: true
     });
     fileInput.addEventListener('change', function () {
       var file = fileInput.files && fileInput.files[0];
@@ -968,14 +1218,15 @@
     view.appendChild(el('button', {
       class: 'btn btn-block', type: 'button',
       onclick: function () { fileInput.click(); }
-    }, [el('span', { text: 'Import aus JSON' })]));
+    }, [el('span', { text: 'Import aus ZIP oder JSON' })]));
     view.appendChild(fileInput);
 
     view.appendChild(el('p', { class: 'hint' }, [
-      'JSON ist die vollständige Sicherung zum Wiedereinlesen. ' +
-      'ZIP enthält zusätzlich eine Markdown-Datei pro Notiz. ' +
+      '**ZIP ist die vollständige Sicherung**: Notizen, Lernstand und Anhänge, ' +
+      'dazu eine Markdown-Datei pro Notiz zum Lesen am PC. ' +
+      'JSON enthält alles außer den Anhang-Dateien. ' +
       'Auf dem iPhone erscheint das Teilen-Menü – dort „In Dateien speichern“.'
-    ]));
+    ].join('').replace(/\*\*/g, '')));
 
     /* --- Speicher --- */
     view.appendChild(el('div', { class: 'section-head', text: 'Speicher' }));
@@ -1005,11 +1256,27 @@
     ]));
 
     /* --- Werte nachladen --- */
-    Backup.status().then(function (s) {
+    Promise.all([Backup.status(), DB.attachmentStats(), DB.allCards()])
+      .then(function (r) {
+      var s = r[0];
+      var att = r[1];
+      var cards = r[2];
+
       clear(statusRows);
       statusRows.appendChild(el('div', { class: 'row' }, [
         el('span', { class: 'label', text: 'Notizen' }),
         el('span', { class: 'value', text: String(s.count) })
+      ]));
+      statusRows.appendChild(el('div', { class: 'row' }, [
+        el('span', { class: 'label', text: 'Lernkarten' }),
+        el('span', { class: 'value', text: String(cards.length) })
+      ]));
+      statusRows.appendChild(el('div', { class: 'row' }, [
+        el('span', { class: 'label', text: 'Anhänge' }),
+        el('span', {
+          class: 'value',
+          text: att.count + (att.count ? ' · ' + formatBytes(att.bytes) : '')
+        })
       ]));
       statusRows.appendChild(el('div', { class: 'row' }, [
         el('span', { class: 'label', text: 'Letztes Backup' }),
@@ -1093,15 +1360,24 @@
         ? new Date(parsed.exportedAt).toLocaleString('de-DE')
         : 'unbekannt';
 
+      var inhalt = parsed.notes.length + ' Notizen';
+      if (parsed.cards.length) inhalt += ', ' + parsed.cards.length + ' Karten';
+      if (parsed.attachments.length) {
+        inhalt += ', ' + parsed.attachments.length + ' Anhänge';
+        if (!parsed.files) inhalt += ' (Dateien fehlen – war nur JSON)';
+      }
+
       return DB.count().then(function (have) {
         openSheet('Import', [{
-          label: parsed.notes.length + ' Notizen in der Datei (vom ' + when + ')',
+          label: inhalt + ' · vom ' + when,
           items: [
             {
               label: 'Dazu laden (empfohlen)',
               onClick: function () {
+                toast('Wird eingelesen …');
                 Backup.apply(parsed, 'merge').then(function (r) {
-                  toast(r.added + ' neu, ' + r.updated + ' aktualisiert');
+                  toast(r.added + ' neu, ' + r.updated + ' aktualisiert' +
+                        (r.attachments ? ', ' + r.attachments + ' Anhänge' : ''));
                   render();
                 }).catch(importFailed);
               }
@@ -1111,10 +1387,12 @@
               danger: true,
               onClick: function () {
                 if (!confirm('Alle ' + have + ' Notizen auf diesem Gerät werden ' +
-                             'gelöscht und durch die ' + parsed.notes.length +
-                             ' aus der Datei ersetzt.\n\nFortfahren?')) return;
+                             'gelöscht – mitsamt Lernstand und Anhängen – und durch die ' +
+                             parsed.notes.length + ' aus der Datei ersetzt.\n\nFortfahren?')) return;
+                toast('Wird eingelesen …');
                 Backup.apply(parsed, 'replace').then(function (r) {
-                  toast(r.total + ' Notizen eingelesen');
+                  toast(r.total + ' Notizen eingelesen' +
+                        (r.attachments ? ', ' + r.attachments + ' Anhänge' : ''));
                   render();
                 }).catch(importFailed);
               }
@@ -1165,6 +1443,7 @@
   function render() {
     closeSheet();
     currentNoteMenu = null;
+    releaseUrls();
 
     var hash = location.hash || '#/inbox';
     var queryAt = hash.indexOf('?');
@@ -1197,6 +1476,8 @@
       return Promise.resolve();
     } else if (route === 'tag' && parts[1]) {
       done = renderTag(decodeURIComponent(parts[1]));
+    } else if (route === 'lernen') {
+      done = renderLearn();
     } else if (route === 'einstellungen') {
       done = renderSettings();
     } else {

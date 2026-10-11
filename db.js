@@ -12,7 +12,7 @@ window.DB = (function () {
   'use strict';
 
   var DB_NAME = 'second-brain';
-  var DB_VERSION = 2;
+  var DB_VERSION = 3;
 
   var SECTIONS = ['inbox', 'projekte', 'wissen', 'archiv'];
   var AREAS = ['arbeit', 'fachwirt', 'privat', 'ideen'];
@@ -65,7 +65,20 @@ window.DB = (function () {
       if (!store.indexNames.contains('due')) store.createIndex('due', 'due');
     }
 
-    // if (oldVersion < 3) { ... hier spaetere Aenderungen ... }
+    if (oldVersion < 3) {
+      // Lernkarten: werden aus dem Notiztext erzeugt, der Lernstand
+      // (Faelligkeit, Leichtigkeit) lebt aber hier und bleibt beim
+      // Bearbeiten der Notiz erhalten.
+      var cards = db.createObjectStore('cards', { keyPath: 'id' });
+      cards.createIndex('noteId', 'noteId');
+      cards.createIndex('due', 'due');
+
+      // Anhaenge: Fotos, PDFs und Sprachmemos als Blob
+      var att = db.createObjectStore('attachments', { keyPath: 'id' });
+      att.createIndex('noteId', 'noteId');
+    }
+
+    // if (oldVersion < 4) { ... hier spaetere Aenderungen ... }
   }
 
   /* ---------- kleine Helfer um IndexedDB herum ---------- */
@@ -151,15 +164,29 @@ window.DB = (function () {
   }
 
   function save(note) {
-    return put('notes', derive(note));
+    return put('notes', derive(note)).then(function (saved) {
+      // Lernkarten aus dem Text nachziehen (flashcards.js)
+      if (window.Cards) return Cards.sync(saved).then(function () { return saved; });
+      return saved;
+    });
   }
 
   function getNote(id) {
     return get('notes', id);
   }
 
+  // Mit der Notiz verschwinden auch ihre Lernkarten und Anhaenge.
   function remove(id) {
-    return del('notes', id);
+    return Promise.all([
+      cardsForNote(id),
+      attachmentsForNote(id)
+    ]).then(function (res) {
+      var jobs = res[0].map(function (c) { return del('cards', c.id); })
+        .concat(res[1].map(function (a) { return del('attachments', a.id); }));
+      return Promise.all(jobs);
+    }).then(function () {
+      return del('notes', id);
+    });
   }
 
   function listAll() {
@@ -290,6 +317,56 @@ window.DB = (function () {
     });
   }
 
+  /* ---------- Lernkarten ---------- */
+
+  function cardsForNote(noteId) {
+    return allByIndex('cards', 'noteId', noteId).then(function (cards) {
+      return cards.sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
+    });
+  }
+
+  function allCards() {
+    return all('cards');
+  }
+
+  // Karten, die heute (oder frueher) dran sind
+  function dueCards(until) {
+    var range = IDBKeyRange.upperBound(until == null ? endOfToday() : until);
+    return tx('cards').then(function (s) {
+      return wrap(s.index('due').getAll(range));
+    }).then(function (cards) {
+      return cards.sort(function (a, b) { return a.due - b.due; });
+    });
+  }
+
+  function dueCardCount(until) {
+    return dueCards(until).then(function (c) { return c.length; });
+  }
+
+  function putCard(card) { return put('cards', card); }
+  function deleteCard(id) { return del('cards', id); }
+
+  /* ---------- Anhaenge ---------- */
+
+  function attachmentsForNote(noteId) {
+    return allByIndex('attachments', 'noteId', noteId).then(function (list) {
+      return list.sort(function (a, b) { return a.created - b.created; });
+    });
+  }
+
+  function putAttachment(att) { return put('attachments', att); }
+  function getAttachment(id) { return get('attachments', id); }
+  function deleteAttachment(id) { return del('attachments', id); }
+  function allAttachments() { return all('attachments'); }
+
+  function attachmentStats() {
+    return all('attachments').then(function (list) {
+      var bytes = 0;
+      list.forEach(function (a) { bytes += a.size || 0; });
+      return { count: list.length, bytes: bytes };
+    });
+  }
+
   /* ---------- Einstellungen / Merkwerte ---------- */
 
   function getMeta(key, fallback) {
@@ -316,10 +393,16 @@ window.DB = (function () {
   function replaceAll(notes, meta) {
     return open().then(function (db) {
       return new Promise(function (resolve, reject) {
-        var t = db.transaction(['notes', 'meta'], 'readwrite');
+        var t = db.transaction(['notes', 'meta', 'cards', 'attachments'], 'readwrite');
         var ns = t.objectStore('notes');
         ns.clear();
         notes.forEach(function (n) { ns.put(n); });
+
+        // Lernkarten und Anhaenge gehoeren zu den alten Notizen und
+        // muessen beim Ersetzen mit weg.
+        t.objectStore('cards').clear();
+        t.objectStore('attachments').clear();
+
         if (meta) {
           var ms = t.objectStore('meta');
           Object.keys(meta).forEach(function (k) { ms.put({ key: k, value: meta[k] }); });
@@ -392,6 +475,19 @@ window.DB = (function () {
     dueNotes: dueNotes,
     dueCount: dueCount,
     setDue: setDue,
+    uid: uid,
+    cardsForNote: cardsForNote,
+    allCards: allCards,
+    dueCards: dueCards,
+    dueCardCount: dueCardCount,
+    putCard: putCard,
+    deleteCard: deleteCard,
+    attachmentsForNote: attachmentsForNote,
+    putAttachment: putAttachment,
+    getAttachment: getAttachment,
+    deleteAttachment: deleteAttachment,
+    allAttachments: allAttachments,
+    attachmentStats: attachmentStats,
     blank: blank,
     create: create,
     save: save,
