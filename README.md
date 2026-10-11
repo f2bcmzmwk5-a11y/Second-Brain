@@ -7,7 +7,6 @@ und speichert alle Daten **lokal auf dem Gerät**.
 - **Entwicklung:** Windows-PC mit Claude Code
 - **Hosting:** GitHub Pages (dort liegt nur der Code, keine Notizen)
 - **Sprache der Oberfläche:** Deutsch
-- **Entwickler:** Marcel (kein Profi-Entwickler → kurze, verständliche Erklärungen)
 
 ---
 
@@ -16,21 +15,12 @@ und speichert alle Daten **lokal auf dem Gerät**.
 1. **Erst planen, dann bauen.** Vor jeder Phase: Plan vorlegen, Rückfragen stellen
    (max. 5), auf Freigabe mit **„Los“** warten.
 2. Keine Dateien anlegen oder ändern, bevor der Plan freigegeben ist.
-3. Nach jeder Phase: kurz zusammenfassen, was gebaut wurde, und wie ich es teste.
-4. Dieses README aktuell halten (Abschnitt „Status“ abhaken).
-5. Bei Änderungen an der Datenstruktur immer an die Migration bestehender Daten denken –
-   **meine Notizen dürfen bei Updates nie verloren gehen.**
-
----
-
-## Wofür ich die App nutze
-
-| Lebensbereich | Inhalte |
-|---|---|
-| **Arbeit** | Vertrieb, Kundengespräche, Webshop, Aufgaben, Wiedervorlagen |
-| **Fachwirt** | Prüfungsvorbereitung „Fachwirt E-Commerce (IHK)“, Lernkarten |
-| **Privat** | Projekte, Werkstatt, Reisen, Pläne |
-| **Ideen** | Gedanken, Artikel, Gelerntes |
+3. Erklärungen kurz und ohne Fachjargon – die App wird von einem
+   Nicht-Entwickler gepflegt.
+4. Nach jeder Phase: kurz zusammenfassen, was gebaut wurde, und wie es getestet wird.
+5. Dieses README aktuell halten (Abschnitt „Status“ abhaken).
+6. Bei Änderungen an der Datenstruktur immer an die Migration bestehender Daten denken –
+   **vorhandene Notizen dürfen bei Updates nie verloren gehen.**
 
 ---
 
@@ -74,17 +64,35 @@ Zusätzlich gebaut: Lebensbereich-Filter in jeder Ansicht, Verschieben zwischen
 den Bereichen, Speicheranzeige, Hinweis auf neue App-Version.
 
 ### Phase 2 – Ausbau
-- [ ] Vorlagen: Projekt, Gesprächsnotiz, Lernkarte (`{{date}}`, `{{title}}` ersetzen)
-- [ ] Wiedervorlage mit Fälligkeitsdatum, Startseite zeigt „Heute fällig“
+
+**Phase 2a – Alltag**
+- [ ] Vorlagen: Projekt, Gesprächsnotiz, Lernkarte (`{{date}}`, `{{title}}` ersetzen);
+      Plus-Button lange drücken öffnet die Auswahl
+- [ ] Wiedervorlage mit Fälligkeitsdatum (**nur Datum, keine Uhrzeit**),
+      Startseite zeigt „Heute fällig“
 - [ ] Erinnerungen: Button „Im Kalender erinnern“ erzeugt `.ics`-Datei mit Alarm
-      (Titel = Notiztitel, Link zur Notiz in der Beschreibung) – auch in der installierten App testen
-- [ ] Lernkarten: Antwort erst nach Tippen, Bewertung Nochmal / Schwer / Gut / Leicht,
+      um **9:00 Uhr** (Titel = Notiztitel, Link zur Notiz in der Beschreibung)
+      – nur in der installierten App testbar
+
+**Phase 2b – Lernen und Medien**
+- [ ] Lernkarten: **mehrere Karten pro Notiz, Trennzeichen `::`**
+      (`Deckungsbeitrag :: Umsatz minus variable Kosten`).
+      Antwort erst nach Tippen, Bewertung Nochmal / Schwer / Gut / Leicht,
       vereinfachtes SM-2, Anzeige „X Karten heute fällig“
 - [ ] Anhänge: Fotos (Kamera/Mediathek) und PDFs; Bilder vor dem Speichern verkleinern
 - [ ] Sprachmemos als Anhang (MediaRecorder); Diktat als Text über iPhone-Tastatur
       → Eingabefelder groß gestalten
-- [ ] Speicherverbrauch in den Einstellungen anzeigen
-- [ ] Anhänge im ZIP-Export mitsichern
+- [ ] **ZIP wird Vollbackup:** Anhänge mitsichern **und Import auch aus ZIP.**
+      JSON bleibt, warnt aber, dass Anhänge fehlen
+- [x] Speicherverbrauch in den Einstellungen anzeigen *(schon in Phase 1 erledigt)*
+
+**Technisch:** Datenbank auf Version 2 (neue Speicher `anhaenge` und `karten`,
+Feld `due`) – rein ergänzend, bestehende Notizen werden nicht umgeschrieben.
+
+**Grenze der Kalender-Erinnerung:** Die `.ics` erzeugt einen einmaligen
+Kalendereintrag. Wird die Wiedervorlage später in der App geändert, ändert sich
+der Kalendertermin **nicht** mit. Echte Push-Benachrichtigungen wären die
+saubere Lösung – siehe „Optional später“.
 
 ### Phase 3 – Synchronisation mit dem Windows-PC
 Vor der Umsetzung eigenen Plan erstellen und ehrlich vergleichen
